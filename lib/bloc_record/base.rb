@@ -9,6 +9,7 @@ module BlocRecord
     include Persistence
     extend Schema
     extend Connection
+    extend Selection
 
     def initialize(options={})
       options = BlocRecord::Utility.convert_keys(options)
