@@ -2,6 +2,9 @@ require 'sqlite3'
 
 module Selection
   def find(*ids)
+    ids.each do |items|
+      return unless check_for_valid_id(items)
+    end
     begin
       if ids.length == 1
         find_one(ids.first)
@@ -31,8 +34,39 @@ module Selection
      SELECT #{columns.join ","} FROM #{table}
      WHERE #{attribute} = #{BlocRecord::Utility.sql_strings(value)};
    SQL
-
+   puts "This is the value: #{value}"
    init_object_from_row(row)
+  end
+
+  def find_each(*args)
+    if args.length > 0
+      #there are arguments - parse key and values
+      arguments = args[0].to_h
+      start = arguments[:start]
+      batch_size = arguments[:batch_size]
+      rows = connection.execute <<-SQL
+        SELECT #{columns.join ","} FROM #{table}
+        WHERE id = #{start}
+        LIMIT #{batch_size}
+        SQL
+      entries = rows_to_array(rows)
+      entries.each{ |e| yield e }
+    else
+      #get all items
+      entries = self.all
+      entries.each{ |e| yield e }
+    end
+  end
+
+  def find_in_batches(*args)
+    arguments = args[0].to_h
+    start = arguments[:start]
+    batch_size = arguments[:batch_size]
+    rows = connection.execute <<-SQL
+      SELECT #{columns.join ","} FROM #{table}
+      WHERE id = #{start}
+      LIMIT #{batch_size}
+      SQL
   end
 
   def take(num=1)
@@ -85,6 +119,19 @@ module Selection
 
     rows_to_array(rows)
   end
+
+  def method_missing(m, *args, &block)
+      value = args[0]
+      case m.to_s
+        when 'find_by_name'
+          self.find_by(:name, value)
+        when 'find_by_phone'
+          self.find_by(:phone_number, value)
+        else
+          puts "There is no method, you have an error"
+      end
+  end
+
 
   private
   def init_object_from_row(row)
