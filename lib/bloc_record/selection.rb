@@ -38,35 +38,42 @@ module Selection
    init_object_from_row(row)
   end
 
-  def find_each(*args)
-    if args.length > 0
-      #there are arguments - parse key and values
-      arguments = args[0].to_h
-      start = arguments[:start]
-      batch_size = arguments[:batch_size]
-      rows = connection.execute <<-SQL
-        SELECT #{columns.join ","} FROM #{table}
-        WHERE id = #{start}
-        LIMIT #{batch_size}
-        SQL
-      entries = rows_to_array(rows)
-      entries.each{ |e| yield e }
-    else
-      #get all items
-      entries = self.all
-      entries.each{ |e| yield e }
-    end
-  end
-
-  def find_in_batches(*args)
-    arguments = args[0].to_h
-    start = arguments[:start]
-    batch_size = arguments[:batch_size]
+  def find_each(start: 1, batch_size: 1000)
     rows = connection.execute <<-SQL
       SELECT #{columns.join ","} FROM #{table}
       WHERE id = #{start}
       LIMIT #{batch_size}
       SQL
+    entries = rows_to_array(rows)
+    entries.each{ |e| yield e }
+  end
+
+
+  def find_batch(start, batch_size)
+    #find one batch
+    rows = connection.execute <<-SQL
+      SELECT #{columns.join ","} FROM #{table}
+      WHERE id = #{start}
+      LIMIT #{batch_size}
+      SQL
+    rows_to_array(rows)
+  end
+
+  def find_in_batches(start, batch_size)
+    #find out how many records are total
+    row = connection.execute <<-SQL
+      SELECT count(id) FROM #{table};
+    SQL
+    max = row[0][0]
+    batch_num = 0;
+    while start < max do
+      # find batch
+      entries = find_batch(start, batch_size)
+      entries.each{ |e| yield e }
+      #increment batch_start, batch_num
+      start += batch_size
+      batch_num += 1
+    end
   end
 
   def take(num=1)
