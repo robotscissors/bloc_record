@@ -140,6 +140,88 @@ module Selection
   end
 
 
+  def where(*args)
+    if args.count > 1
+      expression = args.shift
+      params = args
+    else
+        case args.first
+        when String
+          expression = args.first
+        when Hash
+          expression_hash = BlocRecord::Utility.convert_keys(args.first)
+          expression = expression_hash.map {|key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}"}.join(" and ")
+        end
+    end
+
+    sql = <<-SQL
+      SELECT #{columns.join ","} FROM #{table}
+      WHERE #{expression};
+    SQL
+
+    rows = connection.execute(sql, params)
+    rows_to_array(rows)
+  end
+
+  def order(*args)
+    all_args=[]
+    if args.length>0
+      args.each do |arg|
+        case arg
+        when Symbol #a symbol only
+          all_args << arg.to_s + " ASC"
+        when Hash # a hash
+          arg.each{|k,v| all_args << "#{k} #{v}"}
+        when String # a string
+          all_args << arg
+        end
+      end
+      order = all_args.join(', ')
+
+      rows = connection.execute <<-SQL
+        SELECT * FROM #{table}
+        ORDER BY #{order};
+      SQL
+    else
+       # there are no parameters
+       rows = connection.execute <<-SQL
+         SELECT * FROM #{table};
+       SQL
+    end
+    rows_to_array(rows)
+  end
+
+  def join(*args)
+    if args.count > 1
+      joins = args.map { |arg| "INNER JOIN #{arg} ON #{arg}.#{table}_id = #{table}.id"}.join(" ")
+      rows = connection.execute <<-SQL
+        SELECT * FROM #{table} #{joins}
+      SQL
+    else
+      case args.first
+      when String
+        rows = connection.execute <<-SQL
+          SELECT * FROM #{table} #{BlocRecord::Utility.sql_strings(args.first)};
+        SQL
+      when Symbol
+        rows = connection.execute <<-SQL
+          SELECT * FROM #{table}
+          INNER JOIN #{args.first} ON #{args.first}.#{table}_id = #{table}.id
+        SQL
+      when Hash
+        table1 = args.first.keys[0].to_s.slice!(0..-2)
+        table2 = args.first.values[0].to_s
+        rows = connection.execute <<-SQL
+          SELECT * FROM #{table}
+          INNER JOIN #{table1} ON #{table1}.#{table}_id = #{table}_id
+          INNER JOIN #{table2} ON #{table2}.#{table1}_id = #{table1}_id
+        SQL
+      end
+    end
+
+    rows_to_array(rows)
+  end
+
   private
   def init_object_from_row(row)
    if row
