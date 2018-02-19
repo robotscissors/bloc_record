@@ -89,9 +89,18 @@ module Persistence
       end
       true
     end
+  end
 
-    def update_attribute(attribute, value)
-      self.class.update(self.id, { attribute => value })
-    end
+  def method_missing(m, *args, &block)
+      value = args[0]
+
+      case m.to_s
+        when /^update_/
+          puts 'I caught an UPDATE'
+          attribute_name = m.slice(7,m.length).to_sym
+          self.update_attribute(attribute_name, value)
+        else
+          puts "There is no method, you have an error"
+      end
   end
 end

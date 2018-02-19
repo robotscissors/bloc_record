@@ -129,6 +129,7 @@ module Selection
 
   def method_missing(m, *args, &block)
       value = args[0]
+      puts "----- #{m.to_s}"
       case m.to_s
         when 'find_by_name'
           self.find_by(:name, value)
