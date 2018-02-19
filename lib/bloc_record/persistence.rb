@@ -29,7 +29,19 @@ module Persistence
      true
    end
 
+   def update_attribute(attribute, value)
+     self.class.update(self.id, { attribute => value })
+   end
+
+   def update_attributes(updates)
+     self.class.update(self.id, updates)
+   end
+
   module ClassMethods
+    def update_all(updates)
+      update(nil, updates)
+    end
+
     def create(attrs)
       attrs = BlocRecord::Utility.convert_keys(attrs)
       attrs.delete "id"
@@ -45,18 +57,41 @@ module Persistence
       new(data)
     end
 
-    def update(id, updates)
-      updates = BlocRecord::Utility.convert_keys(updates)
-      updates.delete "id"
-      updates_array = updates.map { |key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}" }
+    def update(ids, updates)
+      #check to see if updates is an array or hash
+      if updates.class == Array #then mulitple updates
+        id = 0
+        updates.each do |update|
+          new_set = update.map { |key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}" }[0]
+          connection.execute <<-SQL
+            UPDATE #{table}
+            SET #{new_set} WHERE id = #{ids[id]}
+          SQL
+          id += 1
+        end
+      else
+        updates = BlocRecord::Utility.convert_keys(updates)
+        updates.delete "id"
+        updates_array = updates.map { |key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}" }
 
-      connection.execute <<-SQL
-        UPDATE #{table}
-        SET #{updates_array * ","}
-        WHERE id = #{id};
-      SQL
+        if ids.class == Fixnum
+          where_clause = "WHERE id = #{ids};"
+        elsif ids.class == Array
+          where_clause = ids.empty? ? ";" : "WHERE id IN (#{ids.join(",")});"
+        else
+          where_clause = ";"
+        end
 
+        connection.execute <<-SQL
+          UPDATE #{table}
+          SET #{updates_array * ","} #{where_clause}
+        SQL
+      end
       true
+    end
+
+    def update_attribute(attribute, value)
+      self.class.update(self.id, { attribute => value })
     end
   end
 end
