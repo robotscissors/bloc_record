@@ -96,7 +96,6 @@ module Persistence
 
       case m.to_s
         when /^update_/
-          puts 'I caught an UPDATE'
           attribute_name = m.slice(7,m.length).to_sym
           self.update_attribute(attribute_name, value)
         else

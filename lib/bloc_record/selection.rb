@@ -129,7 +129,6 @@ module Selection
 
   def method_missing(m, *args, &block)
       value = args[0]
-      puts "----- #{m.to_s}"
       case m.to_s
         when 'find_by_name'
           self.find_by(:name, value)
@@ -142,26 +141,31 @@ module Selection
 
 
   def where(*args)
-    if args.count > 1
-      expression = args.shift
-      params = args
+    if args.count == 0
+      #need this to support .not feature
+      self.all
+
     else
-        case args.first
-        when String
-          expression = args.first
-        when Hash
-          expression_hash = BlocRecord::Utility.convert_keys(args.first)
-          expression = expression_hash.map {|key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}"}.join(" and ")
+      if args.count > 1
+          expression = args.shift
+          params = args
+        else
+            case args.first
+            when String
+              expression = args.first
+            when Hash
+              expression_hash = BlocRecord::Utility.convert_keys(args.first)
+              expression = expression_hash.map {|key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}"}.join(" and ")
+            end
         end
-    end
 
-    sql = <<-SQL
-      SELECT #{columns.join ","} FROM #{table}
-      WHERE #{expression};
-    SQL
-
+      sql = <<-SQL
+        SELECT #{columns.join ","} FROM #{table}
+        WHERE #{expression};
+      SQL
     rows = connection.execute(sql, params)
     rows_to_array(rows)
+    end
   end
 
   def order(*args)
