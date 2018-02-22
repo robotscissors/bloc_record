@@ -5,6 +5,7 @@ require 'bloc_record/selection'
 require 'bloc_record/connection'
 require 'bloc_record/collection'
 
+
 module BlocRecord
   class Base
     include Persistence
