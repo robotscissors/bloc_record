@@ -27,5 +27,9 @@ module BlocRecord
       self.any? ? self.first.class.where(expression) : false
     end
 
+    def destroy_all
+      ids = self.map(&:id)
+      self.any? ? self.first.class.destroy(ids) : false
+    end
   end
 end

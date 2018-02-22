@@ -18,28 +18,82 @@ module Persistence
       return true
     end
 
-     fields = self.class.attributes.map { |col| "#{col}=#{BlocRecord::Utility.sql_strings(self.instance_variable_get("@#{col}"))}" }.join(",")
+   fields = self.class.attributes.map { |col| "#{col}=#{BlocRecord::Utility.sql_strings(self.instance_variable_get("@#{col}"))}" }.join(",")
 
-     self.class.connection.execute <<-SQL
-       UPDATE #{self.class.table}
-       SET #{fields}
-       WHERE id = #{self.id};
-     SQL
+   self.class.connection.execute <<-SQL
+     UPDATE #{self.class.table}
+     SET #{fields}
+     WHERE id = #{self.id};
+   SQL
 
-     true
-   end
+   true
+  end
 
-   def update_attribute(attribute, value)
-     self.class.update(self.id, { attribute => value })
-   end
+  def update_attribute(attribute, value)
+   self.class.update(self.id, { attribute => value })
+  end
 
-   def update_attributes(updates)
-     self.class.update(self.id, updates)
-   end
+  def update_attributes(updates)
+   self.class.update(self.id, updates)
+  end
+
+  def destroy
+    self.class.destroy(self.id)
+  end
 
   module ClassMethods
     def update_all(updates)
       update(nil, updates)
+    end
+
+    def destroy(*id)
+      puts "#{id} - length"
+     if id.length > 1
+       where_clause = "WHERE id IN (#{id.join(",")});"
+     else
+       case id.first
+       when Array
+         where_clause = "WHERE id IN (#{id.join(",")});"
+       else
+         where_clause = "WHERE id = #{id.first};"
+       end
+     end
+     puts "DELETE FROM #{table} #{where_clause}"
+       connection.execute <<-SQL
+         DELETE FROM #{table} #{where_clause}
+       SQL
+     true
+    end
+
+    def destroy_all(*args)
+      if args.length > 1
+          conditions = args.first.gsub(/\?/,"'"+args[1]+"'")
+          connection.execute <<-SQL
+          DELETE FROM #{table}
+          WHERE #{conditions};
+        SQL
+      else
+        case args.first
+        when String
+          conditions = args.first
+          connection.execute <<-SQL
+            DELETE FROM #{table}
+            WHERE #{conditions};
+          SQL
+        when HASH && args.first && !args.first.empty?
+            conditions_hash = BlocRecord::Utility.convert_keys(args.first)
+            conditions = conditions_hash.map {|key, value| "#{key}=#{BlocRecord::Utility.sql_strings(value)}"}.join(" and ")
+            connection.execute <<-SQL
+              DELETE FROM #{table}
+              WHERE #{conditions};
+            SQL
+        else
+          connection.execute <<-SQL
+            DELETE FROM #{table}
+          SQL
+        end
+      end
+      true
     end
 
     def create(attrs)
